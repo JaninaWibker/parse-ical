@@ -1,0 +1,35 @@
+BEGIN:VCALENDAR
+PRODID:-//Google Inc//Google Calendar 70.9054//EN
+VERSION:2.0
+CALSCALE:GREGORIAN
+X-WR-TIMEZONE:Europe/Berlin
+BEGIN:VTIMEZONE
+TZID:Europe/Berlin
+END:VTIMEZONE
+BEGIN:VEVENT
+DTSTART;TZID=Europe/Berlin:20230306T143000
+DTEND;TZID=Europe/Berlin:20230306T150000
+DTSTAMP:20240310T170000Z
+CREATED:20230107T123000Z
+LAST-MODIFIED:20230425T110000Z
+RECURRENCE-ID;TZID=Europe/Berlin:20230306T143000
+SEQUENCE:1
+UID:e0de738a-1b58-49a3-9266-e0716471a0fa
+ORGANIZER;CN=Alice:mailto:alice@example.com
+ATTENDEE;CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;PARTSTAT=ACCEPTED;CN=bob@ex
+ ample.com;X-NUM-GUESTS=0:mailto:bob@example.com
+ATTENDEE;CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;PARTSTAT=ACCEPTED;CN=Alice;
+ X-NUM-GUESTS=0:mailto:alice@example.com
+X-GOOGLE-CONFERENCE:https://meet.google.com/xxx-xxxx-xxx
+DESCRIPTION:-::~:~::~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~
+ :~:~:~:~:~:~:~:~::~:~::-\nJoin with Google Meet: https://meet.google.com/xx
+ x-xxxx-xxx\nOr dial: (DE) +00 00 0000000000 PIN: 123456789#\nMore phone num
+ bers: https://tel.meet/xxx-xxxx-xxx?pin=0000000000000&hs=0\n\nLearn more ab
+ out Meet at: https://support.google.com/a/users/answer/9282720\n\nPlease do
+  not edit this section.\n-::~:~::~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:
+ ~:~:~:~:~:~:~:~:~:~:~:~:~:~:~::~:~::-
+STATUS:CONFIRMED
+SUMMARY:Weekly Sync Meeting
+TRANSP:OPAQUE
+END:VEVENT
+END:VCALENDAR
