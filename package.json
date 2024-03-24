@@ -1,6 +1,6 @@
 {
   "name": "parse-ical",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Parse iCAL (.ics) data into JS objects",
   "author": "Janina Wibker",
   "scripts": {
@@ -17,6 +17,12 @@
   "keywords": ["ical", "ics", "calendar", "typescript"],
   "license": "MIT",
   "type": "module",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "package.json"
+  ],
   "exports": {
     ".": {
       "import": {
