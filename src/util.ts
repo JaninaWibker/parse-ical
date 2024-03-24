@@ -1,3 +1,19 @@
+const getTimezoneOffsetFromTZID = (tzid: string) => {
+  // '1/1/2024, GMT+1:00'
+  const dateText = Intl.DateTimeFormat([], { timeZone: tzid, timeZoneName: 'longOffset' }).format(new Date())
+  // 'GMT+1:00'
+  const offsetText = dateText.split(' ')[1] || 'GMT+0:00'
+
+  // ['+1', '00']
+  const [signAndHours, minutesText] = offsetText.slice(3).split(':')
+
+  const sign = signAndHours![0] === '-' ? -1 : 1
+  const hours = parseInt(signAndHours!.slice(1))
+  const minutes = parseInt(minutesText!)
+
+  return sign * (hours * 60 + minutes)
+}
+
 const validateICalDateAndTime = (date: string) => {
   const chars = date.split('')
 
@@ -26,13 +42,25 @@ export const parseDateAndTime = (date: string) => {
   return new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}.000Z`)
 }
 
-export const parseDate = (date: string) => {
+export const parseDate = (date: string, timezone: string) => {
   // YYYYMMDD
   const year = parseInt(date.substring(0, 4))
   const month = parseInt(date.substring(4, 6))
   const day = parseInt(date.substring(6, 8))
 
-  return new Date(year, month - 1, day)
+  // the offset from gmt is initially inverted
+  const offsetFromGMT = -new Date().getTimezoneOffset()
+  const offsetFromTargetTimezoneToGMT = getTimezoneOffsetFromTZID(timezone)
+
+  const dateInLocalTimezone = new Date(year, month - 1, day)
+
+  // first adjust to GMT
+  dateInLocalTimezone.setMinutes(dateInLocalTimezone.getMinutes() - offsetFromGMT)
+
+  // then to the target timezone
+  dateInLocalTimezone.setMinutes(dateInLocalTimezone.getMinutes() + offsetFromTargetTimezoneToGMT)
+
+  return new Date(dateInLocalTimezone)
 }
 
 export const normalizeAndSplitLines = (text: string) =>

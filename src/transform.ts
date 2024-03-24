@@ -40,7 +40,7 @@ const optionalButIfSetMustNotHaveParameters = (
   }
 }
 
-export const matchDateParameters = (date: Property, defaultTimezone: string | undefined) => {
+export const matchDateParameters = (date: Property, defaultTimezone: string) => {
   mustOnlyOccurOnce(date, 'DATE')
 
   const actualDate = date[0]!.value
@@ -49,7 +49,9 @@ export const matchDateParameters = (date: Property, defaultTimezone: string | un
   const isAllDay = actualParams.VALUE === 'DATE'
   const tzid = actualParams.TZID
 
-  const parsedDate = isAllDay ? parseDate(actualDate) : parseDateAndTime(tzid ? actualDate + 'Z' : actualDate)
+  const parsedDate = isAllDay
+    ? parseDate(actualDate, tzid ?? defaultTimezone)
+    : parseDateAndTime(tzid ? actualDate + 'Z' : actualDate)
 
   // if tzid is set, then the date format forgoes the 'Z' suffix
   // omitting (or changing) the timezone does not change the date, it is correctly encoded as UTC
@@ -82,7 +84,7 @@ export const matchRecurrenceRules = (
     exdate,
     recurrenceId
   }: Record<'rrule' | 'sequence' | 'exdate' | 'recurrenceId', Property | undefined>,
-  defaultTimezone: string | undefined
+  defaultTimezone: string
 ) => {
   optionalButIfSetMustOccurOnlyOnce(sequence, 'SEQUENCE')
   optionalButIfSetMustNotHaveParameters(sequence, 'SEQUENCE')
@@ -119,7 +121,7 @@ export const matchRecurrenceRules = (
   }
 }
 
-export const matchEvent = (component: Component, options: { timezone: string | undefined }): CalendarEvent => {
+export const matchEvent = (component: Component, options: { timezone: string }): CalendarEvent => {
   if (
     Object.entries(component.components).length !== 0 &&
     Object.keys(component.components).some((key) => key !== 'VALARM')
