@@ -16,6 +16,7 @@ jobs:
         with:
           node-version: 20
           cache: "pnpm"
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Determine last published version of parse-ical
         run: |
@@ -34,7 +35,7 @@ jobs:
         uses: Quantco/ui-actions/publish@v1.0.15
         with:
           increment-type: minor
-          relevant-files: '["**/*"]'
+          relevant-files: '[".*/**/*", "**/*"]'
           latest-registry-version: ${{ env.NPM_PUBLISHED_VERSION }}
           version-metadata-json: ${{ steps.version-metadata.outputs.json }}
 
@@ -49,6 +50,8 @@ jobs:
           npm version --git-tag-version false --allow-same-version true ${{ steps.publish.outputs.version }}
           # TODO: commented out for now, will comment in once the first stable version is ready
           pnpm publish --no-git-checks --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create action summary
         run: |
