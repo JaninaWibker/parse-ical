@@ -1,6 +1,6 @@
-const getTimezoneOffsetFromTZID = (tzid: string) => {
+const getTimezoneOffsetFromTZID = (tzid: string, date: Date) => {
   // '1/1/2024, GMT+1:00'
-  const dateText = Intl.DateTimeFormat([], { timeZone: tzid, timeZoneName: 'longOffset' }).format(new Date())
+  const dateText = Intl.DateTimeFormat([], { timeZone: tzid, timeZoneName: 'longOffset' }).format(new Date(date))
   // 'GMT+1:00'
   const offsetText = dateText.split(' ')[1] || 'GMT+0:00'
 
@@ -48,20 +48,26 @@ export const parseDate = (date: string, timezone: string) => {
   const month = parseInt(date.substring(4, 6))
   const day = parseInt(date.substring(6, 8))
 
-  // local -> gmt by adding value
-  // gmt -> local by subtracting value
-  const offsetFromGMT = new Date().getTimezoneOffset()
-
-  // target -> gmt by adding value
-  // gmt -> target by subtracting value
-  const offsetFromTargetTimezoneToGMT = getTimezoneOffsetFromTZID(timezone)
-
   const dateInLocalTimezone = new Date(year, month - 1, day)
 
-  // first adjust to GMT
+  // find the timezone offsets based on the dateInLocalTimezone
+  // because otherwise daylight saving time will not be taken into account
+  // when converting between timezones
+
+  // this is very much similar to a change of basis in linear algebra :)
+
+  // local -> gmt   by adding value
+  // gmt   -> local by subtracting value
+  const offsetFromGMT = -new Date(dateInLocalTimezone).getTimezoneOffset()
+
+  // target -> gmt    by adding value
+  // gmt    -> target by subtracting value
+  const offsetFromTargetTimezoneToGMT = getTimezoneOffsetFromTZID(timezone, dateInLocalTimezone)
+
+  // first adjust to GMT (local -> gmt; thus adding the offset)
   dateInLocalTimezone.setMinutes(dateInLocalTimezone.getMinutes() + offsetFromGMT)
 
-  // then to the target timezone
+  // then to the target timezone (gmt -> target; thus subtracting the offset)
   dateInLocalTimezone.setMinutes(dateInLocalTimezone.getMinutes() - offsetFromTargetTimezoneToGMT)
 
   return new Date(dateInLocalTimezone)
