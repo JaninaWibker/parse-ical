@@ -1,6 +1,6 @@
 {
   "name": "parse-ical",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Parse iCAL (.ics) data into JS objects",
   "author": "Janina Wibker",
   "scripts": {

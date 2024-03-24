@@ -24,6 +24,12 @@ yarn add parse-ical
 bun add parse-ical
 ```
 
+> [!NOTE]
+> Make sure to use `"moduleResolution": "bundler"` in your `tsconfig.json` if you are using ESM.
+> `"moduleResolution": "node"` **doesn't** support the `exports` field in `package.json` and thus is not able to import the package.
+> This is not easy to debug and often overlooked.
+
+
 ## Usage
 
 ```ts
@@ -61,6 +67,7 @@ const transform: (syntaxTree: Component) => {
   events: CalendarEvent[]
 }
 ```
+
 
 ## License
 
