@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { transform, parse } from '../src/index'
+import { transform, parse } from 'parse-ical'
 import { loadFixture } from './helper'
 
 test('Basic usage', async () => {

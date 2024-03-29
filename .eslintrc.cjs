@@ -1,7 +1,7 @@
 /** @type {import('eslint').Linter.Config} */
 
 module.exports = {
-  ignorePatterns: ['dist/**/*'],
+  ignorePatterns: ['**/dist/**/*'],
   extends: ['standard', 'plugin:@typescript-eslint/recommended', 'plugin:prettier/recommended'],
   parser: '@typescript-eslint/parser',
   parserOptions: {

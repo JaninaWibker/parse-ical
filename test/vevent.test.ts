@@ -1,5 +1,5 @@
 import { expect, test, vi } from 'vitest'
-import { transform, parse } from '../src/index'
+import { transform, parse } from 'parse-ical'
 import { loadFixture } from './helper'
 
 test("doesn't fail if optional fields are left empty", async () => {
