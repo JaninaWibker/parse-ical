@@ -1,4 +1,4 @@
-import { rrulestr } from 'rrule'
+import { rrulestr } from './rrule-wrapper'
 import type { CalendarEvent, CalendarMetadata, Component, Property } from './types'
 import { parseDate, parseDateAndTime } from './util'
 
