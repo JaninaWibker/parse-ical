@@ -48,6 +48,7 @@ jobs:
           pnpm build
           pnpm test
           echo "Publishing version ${{ steps.publish.outputs.version }}"
+          cp README.md lib/README.md
           pnpm --filter "parse-ical" exec npm version --git-tag-version false --allow-same-version true ${{ steps.publish.outputs.version }}
           pnpm --filter "parse-ical" publish --no-git-checks --access public
         env:

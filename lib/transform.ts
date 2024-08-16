@@ -1,31 +1,46 @@
 import { rrulestr } from './rrule-wrapper'
-import type { CalendarEvent, CalendarMetadata, Component, Property } from './types'
-import { parseDate, parseDateAndTime } from './util'
+import type { CalendarDate, CalendarEvent, CalendarMetadata, Component, Property } from './types'
+import { parseDate, parseDateAndTime, parseDuration } from './util'
 
-const mustOnlyOccurOnce = (property: Property | undefined, name: string, overrideScope = 'VEVENT') => {
+const mustOnlyOccurOnce = (
+  property: Property | undefined,
+  name: string,
+  received: Component | Property | undefined,
+  overrideScope = 'VEVENT'
+) => {
   if (!property) {
-    throw new Error(`${overrideScope} must have ${name}`)
+    throw new Error(`${overrideScope} must have ${name}, received: ${JSON.stringify(received, null, 2)}`)
   }
   if (property.length !== 1) {
-    throw new Error(`${overrideScope} ${name} must only occur once`)
+    throw new Error(`${overrideScope} ${name} must only occur once, received: ${JSON.stringify(received, null, 2)}`)
   }
 }
 
-const optionalButIfSetMustOccurOnlyOnce = (property: Property | undefined, name: string, overrideScope = 'VEVENT') => {
+const optionalButIfSetMustOccurOnlyOnce = (
+  property: Property | undefined,
+  name: string,
+  received: Component | Property | undefined,
+  overrideScope = 'VEVENT'
+) => {
   if (property) {
-    mustOnlyOccurOnce(property, name, overrideScope)
+    mustOnlyOccurOnce(property, name, received, overrideScope)
   }
 }
 
-const mustNotHaveParameters = (property: Property | undefined, name: string, overrideScope = 'VEVENT') => {
+const mustNotHaveParameters = (
+  property: Property | undefined,
+  name: string,
+  received: Component | Property | undefined,
+  overrideScope = 'VEVENT'
+) => {
   if (!property) {
-    throw new Error(`${overrideScope} must have ${name}`)
+    throw new Error(`${overrideScope} must have ${name}, received: ${JSON.stringify(received, null, 2)}`)
   }
 
   const maybeIndex = property.findIndex(({ parameters }) => Object.keys(parameters).length > 0)
   if (maybeIndex !== -1) {
     throw new Error(
-      `${overrideScope} ${name} must not have parameters ([${maybeIndex}]: ${property[maybeIndex]!.parameters})`
+      `${overrideScope} ${name} must not have parameters ([${maybeIndex}]: ${property[maybeIndex]!.parameters}), received: ${JSON.stringify(received, null, 2)}`
     )
   }
 }
@@ -33,15 +48,28 @@ const mustNotHaveParameters = (property: Property | undefined, name: string, ove
 const optionalButIfSetMustNotHaveParameters = (
   property: Property | undefined,
   name: string,
+  received: Component | Property | undefined,
   overrideScope = 'VEVENT'
 ) => {
   if (property) {
-    mustNotHaveParameters(property, name, overrideScope)
+    mustNotHaveParameters(property, name, received, overrideScope)
+  }
+}
+
+const optionalButMutuallyExclusiveIfSet = (
+  properties: [Property | undefined, string][],
+  errorMessage: string,
+  received: Component | Property | undefined,
+  overrideScope = 'VEVENT'
+) => {
+  const setProperties = properties.filter(([property]) => property)
+  if (setProperties.length > 1) {
+    throw new Error(`${overrideScope} ${errorMessage}, received: ${JSON.stringify(received, null, 2)}`)
   }
 }
 
 export const matchDateParameters = (date: Property, defaultTimezone: string) => {
-  mustOnlyOccurOnce(date, 'DATE')
+  mustOnlyOccurOnce(date, 'DATE', date)
 
   const actualDate = date[0]!.value
   const actualParams = date[0]!.parameters
@@ -71,8 +99,8 @@ export const matchAlarm = (component: Component) => {
 }
 
 export const matchTimezone = (component: Component) => {
-  mustOnlyOccurOnce(component.properties.TZID, 'TZID', 'VTIMEZONE')
-  mustNotHaveParameters(component.properties.TZID, 'TZID', 'VTIMEZONE')
+  mustOnlyOccurOnce(component.properties.TZID, 'TZID', component, 'VTIMEZONE')
+  mustNotHaveParameters(component.properties.TZID, 'TZID', component, 'VTIMEZONE')
 
   return component.properties.TZID ? component.properties.TZID[0]!.value : undefined
 }
@@ -86,13 +114,13 @@ export const matchRecurrenceRules = (
   }: Record<'rrule' | 'sequence' | 'exdate' | 'recurrenceId', Property | undefined>,
   defaultTimezone: string
 ) => {
-  optionalButIfSetMustOccurOnlyOnce(sequence, 'SEQUENCE')
-  optionalButIfSetMustNotHaveParameters(sequence, 'SEQUENCE')
+  optionalButIfSetMustOccurOnlyOnce(sequence, 'SEQUENCE', sequence)
+  optionalButIfSetMustNotHaveParameters(sequence, 'SEQUENCE', sequence)
 
-  optionalButIfSetMustOccurOnlyOnce(rrule, 'RRULE')
-  optionalButIfSetMustNotHaveParameters(rrule, 'RRULE')
+  optionalButIfSetMustOccurOnlyOnce(rrule, 'RRULE', rrule)
+  optionalButIfSetMustNotHaveParameters(rrule, 'RRULE', rrule)
 
-  optionalButIfSetMustOccurOnlyOnce(recurrenceId, 'RECURRENCE-ID')
+  optionalButIfSetMustOccurOnlyOnce(recurrenceId, 'RECURRENCE-ID', recurrenceId)
 
   if (sequence && isNaN(parseInt(sequence[0]!.value))) {
     throw new Error('VEVENT SEQUENCE must be a number')
@@ -130,25 +158,37 @@ export const matchEvent = (component: Component, options: { timezone: string }):
   }
 
   // required properties
-  mustOnlyOccurOnce(component.properties.DTSTART, 'DTSTART (start date, potentially without time)')
-  mustOnlyOccurOnce(component.properties.DTEND, 'DTEND (end date, potentially without time)')
-  mustOnlyOccurOnce(component.properties.DTSTAMP, 'DTSTAMP')
-  mustOnlyOccurOnce(component.properties.UID, 'UID (unique identifier)')
-  optionalButIfSetMustOccurOnlyOnce(component.properties['LAST-MODIFIED'], 'LAST-MODIFIED (modification date)')
-  optionalButIfSetMustOccurOnlyOnce(component.properties.CREATED, 'CREATED (creation date)')
-  mustOnlyOccurOnce(component.properties.SUMMARY, 'SUMMARY (title)')
-  mustNotHaveParameters(component.properties.UID, 'UID (unique identifier)')
-  mustNotHaveParameters(component.properties.SUMMARY, 'SUMMARY (title)')
+  mustOnlyOccurOnce(component.properties.DTSTART, 'DTSTART (start date, potentially without time)', component)
+  mustOnlyOccurOnce(component.properties.DTSTAMP, 'DTSTAMP', component)
+  mustOnlyOccurOnce(component.properties.UID, 'UID (unique identifier)', component)
+  optionalButIfSetMustOccurOnlyOnce(
+    component.properties['LAST-MODIFIED'],
+    'LAST-MODIFIED (modification date)',
+    component
+  )
+  optionalButIfSetMustOccurOnlyOnce(component.properties.CREATED, 'CREATED (creation date)', component)
+  mustOnlyOccurOnce(component.properties.SUMMARY, 'SUMMARY (title)', component)
+  mustNotHaveParameters(component.properties.UID, 'UID (unique identifier)', component)
+  mustNotHaveParameters(component.properties.SUMMARY, 'SUMMARY (title)', component)
 
   // optional properties
-  optionalButIfSetMustOccurOnlyOnce(component.properties.LOCATION, 'LOCATION')
-  optionalButIfSetMustOccurOnlyOnce(component.properties.DESCRIPTION, 'DESCRIPTION')
-  optionalButIfSetMustOccurOnlyOnce(component.properties.STATUS, 'STATUS')
-  optionalButIfSetMustOccurOnlyOnce(component.properties.TRANSP, 'TRANSP')
-  optionalButIfSetMustNotHaveParameters(component.properties.LOCATION, 'LOCATION')
-  optionalButIfSetMustNotHaveParameters(component.properties.DESCRIPTION, 'DESCRIPTION')
-  optionalButIfSetMustNotHaveParameters(component.properties.STATUS, 'STATUS')
-  optionalButIfSetMustNotHaveParameters(component.properties.TRANSP, 'TRANSP')
+  optionalButIfSetMustOccurOnlyOnce(component.properties.LOCATION, 'LOCATION', component)
+  optionalButIfSetMustOccurOnlyOnce(component.properties.DESCRIPTION, 'DESCRIPTION', component)
+  optionalButIfSetMustOccurOnlyOnce(component.properties.STATUS, 'STATUS', component)
+  optionalButIfSetMustOccurOnlyOnce(component.properties.TRANSP, 'TRANSP', component)
+  optionalButIfSetMustNotHaveParameters(component.properties.LOCATION, 'LOCATION', component)
+  optionalButIfSetMustNotHaveParameters(component.properties.DESCRIPTION, 'DESCRIPTION', component)
+  optionalButIfSetMustNotHaveParameters(component.properties.STATUS, 'STATUS', component)
+  optionalButIfSetMustNotHaveParameters(component.properties.TRANSP, 'TRANSP', component)
+
+  optionalButMutuallyExclusiveIfSet(
+    [
+      [component.properties.DTEND, 'DTEND'],
+      [component.properties.DURATION, 'DURATION']
+    ],
+    'DTEND and DURATION are mutually exclusive and cannot both be set',
+    component
+  )
 
   const uid = component.properties.UID![0]!.value
   const title = component.properties.SUMMARY![0]!.value
@@ -180,7 +220,41 @@ export const matchEvent = (component: Component, options: { timezone: string }):
     : []
 
   const start = matchDateParameters(component.properties.DTSTART!, options.timezone)
-  const end = matchDateParameters(component.properties.DTEND!, options.timezone)
+  let maybeEnd: CalendarDate | undefined
+
+  if (component.properties.DTEND) {
+    mustOnlyOccurOnce(
+      component.properties.DTEND,
+      'DTEND (end date, potentially without time; can also supply DURATION, but not both; can also supply neither; https://www.rfc-editor.org/rfc/rfc5545#section-3.6.1)',
+      component
+    )
+    maybeEnd = matchDateParameters(component.properties.DTEND!, options.timezone)
+  } else if (component.properties.DURATION) {
+    mustOnlyOccurOnce(
+      component.properties.DURATION,
+      'DURATION (duration, end date = start date + duration; can also supply DTEND, but not both, can also supply neither; https://www.rfc-editor.org/rfc/rfc5545#section-3.6.1)',
+      component
+    )
+    maybeEnd = parseDuration(component.properties.DURATION[0]!.value, start)
+  } else {
+    // https://www.rfc-editor.org/rfc/rfc5545#section-3.6.1
+    // https://www.rfc-editor.org/rfc/rfc5545#page-54
+
+    if (start.isAllDay) {
+      // For cases where a "VEVENT" calendar component specifies a "DTSTART" property with a DATE value type but no "DTEND" nor "DURATION" property, the event's duration is taken to be one day
+      maybeEnd = {
+        date: new Date(start.date.getTime() + 24 * 60 * 60 * 1000),
+        isAllDay: true,
+        timezone: start.timezone
+      }
+    } else {
+      // For cases where a "VEVENT" calendar component specifies a "DTSTART" property with a DATE-TIME value type but no "DTEND" property, the event ends on the same calendar date and time of day specified by the "DTSTART" property.
+      maybeEnd = start
+    }
+  }
+
+  const end = maybeEnd
+
   const modificationDate = component.properties['LAST-MODIFIED']
     ? matchDateParameters(component.properties['LAST-MODIFIED'], options.timezone)
     : undefined
@@ -209,6 +283,7 @@ export const matchEvent = (component: Component, options: { timezone: string }):
         ![
           'DTSTART',
           'DTEND',
+          'DURATION',
           'UID',
           'LAST-MODIFIED',
           'CREATED',
@@ -254,14 +329,14 @@ export const matchEvent = (component: Component, options: { timezone: string }):
 }
 
 export const matchCalendar = (component: Component): { events: CalendarEvent[]; metadata: CalendarMetadata } => {
-  optionalButIfSetMustOccurOnlyOnce(component.properties.VERSION, 'VERSION', 'VCALENDAR')
-  optionalButIfSetMustOccurOnlyOnce(component.properties.PRODID, 'PRODID', 'VCALENDAR')
-  optionalButIfSetMustOccurOnlyOnce(component.properties.CALSCALE, 'CALSCALE', 'VCALENDAR')
-  optionalButIfSetMustNotHaveParameters(component.properties.VERSION, 'VERSION', 'VCALENDAR')
-  optionalButIfSetMustNotHaveParameters(component.properties.PRODID, 'PRODID', 'VCALENDAR')
-  optionalButIfSetMustNotHaveParameters(component.properties.CALSCALE, 'CALSCALE', 'VCALENDAR')
+  optionalButIfSetMustOccurOnlyOnce(component.properties.VERSION, 'VERSION', component, 'VCALENDAR')
+  optionalButIfSetMustOccurOnlyOnce(component.properties.PRODID, 'PRODID', component, 'VCALENDAR')
+  optionalButIfSetMustOccurOnlyOnce(component.properties.CALSCALE, 'CALSCALE', component, 'VCALENDAR')
+  optionalButIfSetMustNotHaveParameters(component.properties.VERSION, 'VERSION', component, 'VCALENDAR')
+  optionalButIfSetMustNotHaveParameters(component.properties.PRODID, 'PRODID', component, 'VCALENDAR')
+  optionalButIfSetMustNotHaveParameters(component.properties.CALSCALE, 'CALSCALE', component, 'VCALENDAR')
 
-  optionalButIfSetMustNotHaveParameters(component.properties['X-WR-TIMEZONE'], 'X-WR-TIMEZONE', 'VCALENDAR')
+  optionalButIfSetMustNotHaveParameters(component.properties['X-WR-TIMEZONE'], 'X-WR-TIMEZONE', component, 'VCALENDAR')
 
   const maybeVersion = component.properties.VERSION ? component.properties.VERSION[0]!.value : undefined
   const maybeProdId = component.properties.PRODID ? component.properties.PRODID[0]!.value : undefined
@@ -291,6 +366,8 @@ export const matchCalendar = (component: Component): { events: CalendarEvent[]; 
 
   const timezone = (maybeXWrTimezone || VTimezone) as string
 
+  // TODO: this could be more "error resilient" by continuing to parse events even if one fails,
+  // TODO: and then grouping the errors together at the end
   const events = component.components.VEVENT
     ? component.components.VEVENT.map((event) => matchEvent(event, { timezone }))
     : []
