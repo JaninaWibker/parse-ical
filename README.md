@@ -1,5 +1,7 @@
 # parse-ical
 
+![npm version](https://img.shields.io/npm/v/parse-ical?color=%23000000)
+
 This is but a simple library that does ical parsing.
 It doesn't support every ical feature out there but should be enough for most use cases.
 
@@ -45,7 +47,7 @@ END:VCALENDAR
 
 ## Types
 
-See [`src/types.ts`](src/types.ts) or check your editor's autocomplete / LSP.
+Use [tsdocs.dev](https://tsdocs.dev/docs/parse-ical) to view the types, alternatively check out [`src/types.ts`](src/types.ts) or your editor's autocomplete / LSP.
 The following types are the most important:
 
 - `CalendarEvent`

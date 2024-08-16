@@ -1,0 +1,17 @@
+{
+  "name": "@parse-ical/test",
+  "private": true,
+  "author": "Janina Wibker",
+  "license": "MIT",
+  "scripts": {
+    "test": "vitest"
+  },
+  "dependencies": {
+    "parse-ical": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "typescript": "^5.4.2",
+    "vitest": "^1.3.1"
+  }
+}
