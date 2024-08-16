@@ -48,7 +48,6 @@ jobs:
           pnpm test
           echo "Publishing version ${{ steps.publish.outputs.version }}"
           npm version --git-tag-version false --allow-same-version true ${{ steps.publish.outputs.version }}
-          # TODO: commented out for now, will comment in once the first stable version is ready
           pnpm publish --no-git-checks --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
