@@ -30,6 +30,7 @@ jobs:
         uses: Quantco/ui-actions/version-metadata@v1.0.15
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          file: 'lib/package.json'
 
       - id: publish
         uses: Quantco/ui-actions/publish@v1.0.15
