@@ -1,3 +1,5 @@
+import type { CalendarDate } from './types'
+
 const getTimezoneOffsetFromTZID = (tzid: string, date: Date) => {
   // '1/1/2024, GMT+1:00'
   const dateText = Intl.DateTimeFormat([], { timeZone: tzid, timeZoneName: 'longOffset' }).format(new Date(date))
@@ -71,6 +73,46 @@ export const parseDate = (date: string, timezone: string) => {
   dateInLocalTimezone.setMinutes(dateInLocalTimezone.getMinutes() - offsetFromTargetTimezoneToGMT)
 
   return new Date(dateInLocalTimezone)
+}
+
+export const parseDurationParts = (duration: string) => {
+  const sign = duration[0] === '-' ? -1 : 1
+
+  const match = duration.match(/-?P(?:(\d+)W)?(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/)
+
+  if (!match) {
+    throw new Error(
+      `Invalid duration format (${duration}), expected https://icalendar.org/iCalendar-RFC-5545/3-3-6-duration.html`
+    )
+  }
+
+  const [, ...parts] = match
+  const [weeks, days, hours, minutes, seconds] = parts.map((part) => (part ? parseInt(part) : 0)) as [
+    number,
+    number,
+    number,
+    number,
+    number
+  ]
+
+  return { sign, weeks, days, hours, minutes, seconds }
+}
+
+export const parseDuration = (duration: string, relativeDate: CalendarDate): CalendarDate => {
+  const { sign, weeks, days, hours, minutes, seconds } = parseDurationParts(duration)
+
+  const date = new Date(relativeDate.date)
+
+  date.setDate(date.getDate() + sign * (weeks * 7 + days))
+  date.setHours(date.getHours() + sign * hours)
+  date.setMinutes(date.getMinutes() + sign * minutes)
+  date.setSeconds(date.getSeconds() + sign * seconds)
+
+  return {
+    date,
+    isAllDay: relativeDate.isAllDay,
+    timezone: relativeDate.timezone
+  }
 }
 
 export const normalizeAndSplitLines = (text: string) =>

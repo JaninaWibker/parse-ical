@@ -1,6 +1,6 @@
 import { rrulestr } from './rrule-wrapper'
-import type { CalendarEvent, CalendarMetadata, Component, Property } from './types'
-import { parseDate, parseDateAndTime } from './util'
+import type { CalendarDate, CalendarEvent, CalendarMetadata, Component, Property } from './types'
+import { parseDate, parseDateAndTime, parseDuration } from './util'
 
 const mustOnlyOccurOnce = (
   property: Property | undefined,
@@ -53,6 +53,18 @@ const optionalButIfSetMustNotHaveParameters = (
 ) => {
   if (property) {
     mustNotHaveParameters(property, name, received, overrideScope)
+  }
+}
+
+const optionalButMutuallyExclusiveIfSet = (
+  properties: [Property | undefined, string][],
+  errorMessage: string,
+  received: Component | Property | undefined,
+  overrideScope = 'VEVENT'
+) => {
+  const setProperties = properties.filter(([property]) => property)
+  if (setProperties.length > 1) {
+    throw new Error(`${overrideScope} ${errorMessage}, received: ${JSON.stringify(received, null, 2)}`)
   }
 }
 
@@ -147,7 +159,6 @@ export const matchEvent = (component: Component, options: { timezone: string }):
 
   // required properties
   mustOnlyOccurOnce(component.properties.DTSTART, 'DTSTART (start date, potentially without time)', component)
-  mustOnlyOccurOnce(component.properties.DTEND, 'DTEND (end date, potentially without time)', component)
   mustOnlyOccurOnce(component.properties.DTSTAMP, 'DTSTAMP', component)
   mustOnlyOccurOnce(component.properties.UID, 'UID (unique identifier)', component)
   optionalButIfSetMustOccurOnlyOnce(
@@ -169,6 +180,15 @@ export const matchEvent = (component: Component, options: { timezone: string }):
   optionalButIfSetMustNotHaveParameters(component.properties.DESCRIPTION, 'DESCRIPTION', component)
   optionalButIfSetMustNotHaveParameters(component.properties.STATUS, 'STATUS', component)
   optionalButIfSetMustNotHaveParameters(component.properties.TRANSP, 'TRANSP', component)
+
+  optionalButMutuallyExclusiveIfSet(
+    [
+      [component.properties.DTEND, 'DTEND'],
+      [component.properties.DURATION, 'DURATION']
+    ],
+    'DTEND and DURATION are mutually exclusive and cannot both be set',
+    component
+  )
 
   const uid = component.properties.UID![0]!.value
   const title = component.properties.SUMMARY![0]!.value
@@ -200,7 +220,41 @@ export const matchEvent = (component: Component, options: { timezone: string }):
     : []
 
   const start = matchDateParameters(component.properties.DTSTART!, options.timezone)
-  const end = matchDateParameters(component.properties.DTEND!, options.timezone)
+  let maybeEnd: CalendarDate | undefined
+
+  if (component.properties.DTEND) {
+    mustOnlyOccurOnce(
+      component.properties.DTEND,
+      'DTEND (end date, potentially without time; can also supply DURATION, but not both; can also supply neither; https://www.rfc-editor.org/rfc/rfc5545#section-3.6.1)',
+      component
+    )
+    maybeEnd = matchDateParameters(component.properties.DTEND!, options.timezone)
+  } else if (component.properties.DURATION) {
+    mustOnlyOccurOnce(
+      component.properties.DURATION,
+      'DURATION (duration, end date = start date + duration; can also supply DTEND, but not both, can also supply neither; https://www.rfc-editor.org/rfc/rfc5545#section-3.6.1)',
+      component
+    )
+    maybeEnd = parseDuration(component.properties.DURATION[0]!.value, start)
+  } else {
+    // https://www.rfc-editor.org/rfc/rfc5545#section-3.6.1
+    // https://www.rfc-editor.org/rfc/rfc5545#page-54
+
+    if (start.isAllDay) {
+      // For cases where a "VEVENT" calendar component specifies a "DTSTART" property with a DATE value type but no "DTEND" nor "DURATION" property, the event's duration is taken to be one day
+      maybeEnd = {
+        date: new Date(start.date.getTime() + 24 * 60 * 60 * 1000),
+        isAllDay: true,
+        timezone: start.timezone
+      }
+    } else {
+      // For cases where a "VEVENT" calendar component specifies a "DTSTART" property with a DATE-TIME value type but no "DTEND" property, the event ends on the same calendar date and time of day specified by the "DTSTART" property.
+      maybeEnd = start
+    }
+  }
+
+  const end = maybeEnd
+
   const modificationDate = component.properties['LAST-MODIFIED']
     ? matchDateParameters(component.properties['LAST-MODIFIED'], options.timezone)
     : undefined
@@ -229,6 +283,7 @@ export const matchEvent = (component: Component, options: { timezone: string }):
         ![
           'DTSTART',
           'DTEND',
+          'DURATION',
           'UID',
           'LAST-MODIFIED',
           'CREATED',
@@ -311,6 +366,8 @@ export const matchCalendar = (component: Component): { events: CalendarEvent[]; 
 
   const timezone = (maybeXWrTimezone || VTimezone) as string
 
+  // TODO: this could be more "error resilient" by continuing to parse events even if one fails,
+  // TODO: and then grouping the errors together at the end
   const events = component.components.VEVENT
     ? component.components.VEVENT.map((event) => matchEvent(event, { timezone }))
     : []
