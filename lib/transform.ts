@@ -161,7 +161,13 @@ export const matchTimezone = (component: Component): CalendarTimezone => {
     ? component.components.STANDARD.map((standard) => matchDaylightOrStandard(standard, 'STANDARD'))
     : []
 
-  return { tzid, lastModified, tzurl, xLicLocation, daylight, standard }
+  const rest = Object.fromEntries(
+    Object.entries(component.properties).filter(
+      ([key]) => !['TZID', 'LAST-MODIFIED', 'TZURL', 'X-LIC-LOCATION', 'DAYLIGHT', 'STANDARD'].includes(key)
+    )
+  )
+
+  return { tzid, lastModified, tzurl, xLicLocation, daylight, standard, rest }
 }
 
 export const matchRecurrenceRules = (

@@ -57,6 +57,8 @@ export type CalendarTimezone = {
   xLicLocation?: string
   daylight: CalendarDaylightOrStandard[]
   standard: CalendarDaylightOrStandard[]
+
+  rest: Properties
 }
 
 export type CalendarMetadata = {
