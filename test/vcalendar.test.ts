@@ -2,18 +2,6 @@ import { expect, test } from 'vitest'
 import { transform, parse } from 'parse-ical'
 import { loadFixture } from './helper'
 
-test('fails if multiple VTIMEZONEs are present', async () => {
-  const parsed = parse(await loadFixture('multiple_vtimezones.ics'))
-
-  expect(() => transform(parsed)).toThrowError()
-})
-
-test('fails if both VTIMEZONE and X-WR-TIMEZONE are present but differ', async () => {
-  const parsed = parse(await loadFixture('different_vtimezone_and_x_wr_timezone.ics'))
-
-  expect(() => transform(parsed)).toThrowError()
-})
-
 test('fails if neither VTIMEZONE nor X-WR-TIMEZONE are present', async () => {
   const parsed = parse(await loadFixture('no_timezone.ics'))
 

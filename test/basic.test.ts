@@ -109,3 +109,83 @@ Please do not edit this section.
     }
   })
 })
+
+test('Can parse X-Params and X-Components in VEVENT', async () => {
+  const calendar = transform(parse(await loadFixture('x-param-x-component.ics')))
+
+  expect(calendar).toMatchObject({
+    events: [
+      {
+        start: {
+          isAllDay: false,
+          date: new Date('2023-03-06T14:30:00.000Z'),
+          timezone: undefined
+        },
+        end: {
+          isAllDay: false,
+          date: new Date('2023-03-06T15:00:00.000Z'),
+          timezone: undefined
+        },
+        modificationDate: {
+          isAllDay: false,
+          date: new Date('2023-04-25T11:00:00.000Z'),
+          timezone: undefined
+        },
+        creationDate: {
+          isAllDay: false,
+          date: new Date('2023-01-07T12:30:00.000Z'),
+          timezone: undefined
+        },
+        dtstamp: {
+          isAllDay: false,
+          date: new Date('2024-03-10T17:00:00.000Z'),
+          timezone: undefined
+        },
+
+        uid: 'e0de738a-1b58-49a3-9266-e0716471a0fa',
+        title: 'Visit the Statue of Liberty',
+        location: 'New York, NY 10004, United States',
+        alarms: [],
+        organizers: [],
+        attendees: [
+          {
+            value: 'mailto:alice@example.com',
+            parameters: {
+              CN: 'Alice',
+              CUTYPE: 'INDIVIDUAL',
+              EMAIL: 'alice@example.com',
+              PARTSTAT: 'NEEDS-ACTION',
+              ROLE: 'REQ-PARTICIPANT',
+              RSVP: 'TRUE',
+              'X-NUM-GUESTS': '0' // X-Param
+            }
+          }
+        ],
+        recurrence: {
+          recurrenceId: undefined,
+          rrule: undefined,
+          exdate: undefined,
+          sequence: undefined
+        },
+
+        status: undefined,
+        transparency: 'OPAQUE',
+
+        rest: {
+          // X-Component
+          'X-APPLE-CREATOR-IDENTITY': [
+            {
+              value: 'com.apple.mobilecal',
+              parameters: {}
+            }
+          ]
+        }
+      }
+    ],
+    metadata: {
+      timezone: 'America/New_York',
+      version: '2.0',
+      calscale: 'GREGORIAN'
+    }
+  })
+})

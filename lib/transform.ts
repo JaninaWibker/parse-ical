@@ -351,29 +351,65 @@ export const matchCalendar = (component: Component): { events: CalendarEvent[]; 
     )
   )
 
+  // timezone parsing is a deviation from the ical spec
+  // In the spec it is assumed that no such thing as a TZ database exists and everything has to be redefined
+  // but here we assume that the browser is able to handle all timezones that are thrown against it, thus there
+  // is no need to redefine "Europe/Berlin" along with all its rules (daylight saving, ..).
+  // This means that certain things no longer work as they are supposed to and the ical file has to have properly
+  // named timezones, but this is a tradeoff that is acceptable for the use case of this library.
+  // It is also pretty common to choose correct names for timezones, so I do not expect someone to define "Asia/Shanghai"
+  // as the same timezone as "America/New_York" or something like that. If someone does that, it is their fault.
+  // I also expect timezone names to be properly formatted, thus "/mozilla.org/20050126_1/America/Cancun" is not valid.
+
+  // And now for what is actually done here instead of following the spec to a T:
+  // If `X-WR-TIMEZONE` is set, use that
+  // If there is one `VTIMEZONE` component, use that
+  // If there are multiple `VTIMEZONE` components, use the first one
+
   // support both X-WR-TIMEZONE (property) and VTIMEZONE (component)
-  const hasVTimezone = !!component.components.VTIMEZONE && component.components.VTIMEZONE.length === 1
+  const VTimezone = component.components.VTIMEZONE ? matchTimezone(component.components.VTIMEZONE[0]!) : undefined
 
-  const VTimezone = hasVTimezone ? matchTimezone(component.components.VTIMEZONE![0]!) : undefined
-
-  if (!!maybeXWrTimezone && hasVTimezone && maybeXWrTimezone !== VTimezone) {
-    throw new Error('VCALENDAR has both X-WR-TIMEZONE and VTIMEZONE, but they do not match')
-  }
-
-  if (!maybeXWrTimezone && !hasVTimezone) {
-    throw new Error('VCALENDAR must contain exactly one VTIMEZONE component or one X-WR-TIMEZONE property')
+  if (!maybeXWrTimezone && !VTimezone) {
+    throw new Error('VCALENDAR must have a configured timezone. Either use X-WR-TIMEZONE or VTIMEZONE')
   }
 
   const timezone = (maybeXWrTimezone || VTimezone) as string
 
-  // TODO: this could be more "error resilient" by continuing to parse events even if one fails,
-  // TODO: and then grouping the errors together at the end
-  const events = component.components.VEVENT
-    ? component.components.VEVENT.map((event) => matchEvent(event, { timezone }))
+  const metadata = { timezone, version: maybeVersion, prodid: maybeProdId, calscale: maybeCalScale, rest }
+
+  const maybeEvents = component.components.VEVENT
+    ? component.components.VEVENT.map((event) => {
+        try {
+          const parsedEvent = matchEvent(event, { timezone })
+          return { success: true, event: parsedEvent }
+        } catch (e) {
+          return { success: false, error: e as Error }
+        }
+      })
     : []
 
-  return {
-    metadata: { timezone, version: maybeVersion, prodid: maybeProdId, calscale: maybeCalScale, rest },
-    events
+  if (maybeEvents.some(({ success }) => !success)) {
+    const errors = maybeEvents.filter(({ success }) => !success).map(({ error }) => error!)
+    const events = maybeEvents.filter(({ success }) => success).map(({ event }) => event)
+
+    const stringifiedErrors = errors.map((error) => error.message).join('\n\n')
+    const stringifiedEvents = JSON.stringify(events, null, 2)
+    const stringifiedMetadata = JSON.stringify(metadata, null, 2)
+
+    throw new Error(
+      [
+        'Failed to parse events. This might not mean that parsing failed for every single event, thus the correctly parsed events and the calendar metadata will be output, as well as the error messages for the events that failed parsing.',
+        'Errors:',
+        stringifiedErrors,
+        'Events:',
+        stringifiedEvents,
+        'Metadata:',
+        stringifiedMetadata
+      ].join('\n\n')
+    )
   }
+
+  const events = maybeEvents.map(({ event }) => event) as CalendarEvent[]
+
+  return { metadata, events }
 }
