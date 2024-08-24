@@ -42,8 +42,26 @@ export type CalendarEvent = {
   rest: Properties
 }
 
+export type CalendarDaylightOrStandard = {
+  tzoffsetfrom: string
+  tzoffsetto: string
+  dtstart: string
+  tzname?: string
+  rrule?: string
+}
+
+export type CalendarTimezone = {
+  tzid: string
+  lastModified?: string
+  tzurl?: string
+  xLicLocation?: string
+  daylight: CalendarDaylightOrStandard[]
+  standard: CalendarDaylightOrStandard[]
+}
+
 export type CalendarMetadata = {
   timezone: string
+  definedTimezones: CalendarTimezone[]
   prodid: string | undefined
   version: string | undefined
   calscale: string | undefined

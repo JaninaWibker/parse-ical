@@ -1,5 +1,13 @@
 import { rrulestr } from './rrule-wrapper'
-import type { CalendarDate, CalendarEvent, CalendarMetadata, Component, Property } from './types'
+import type {
+  CalendarDate,
+  CalendarDaylightOrStandard,
+  CalendarEvent,
+  CalendarMetadata,
+  CalendarTimezone,
+  Component,
+  Property
+} from './types'
 import { parseDate, parseDateAndTime, parseDuration } from './util'
 
 const mustOnlyOccurOnce = (
@@ -98,11 +106,62 @@ export const matchAlarm = (component: Component) => {
   return component.properties
 }
 
-export const matchTimezone = (component: Component) => {
+export const matchDaylightOrStandard = (
+  component: Component,
+  type: 'DAYLIGHT' | 'STANDARD'
+): CalendarDaylightOrStandard => {
+  // known parameters: TZOFFSETFROM(!), TZOFFSETTO(!), DTSTART(!), TZNAME(?), RRULE(?); ? = optional, ! = required
+  mustOnlyOccurOnce(component.properties.TZOFFSETFROM, 'TZOFFSETFROM', component, type)
+  mustOnlyOccurOnce(component.properties.TZOFFSETTO, 'TZOFFSETTO', component, type)
+  mustOnlyOccurOnce(component.properties.DTSTART, 'DTSTART', component, type)
+  optionalButIfSetMustOccurOnlyOnce(component.properties.TZNAME, 'TZNAME', component, type)
+  optionalButIfSetMustOccurOnlyOnce(component.properties.RRULE, 'RRULE', component, type)
+
+  return {
+    tzname: component.properties.TZNAME![0]!.value,
+    tzoffsetfrom: component.properties.TZOFFSETFROM![0]!.value,
+    tzoffsetto: component.properties.TZOFFSETTO![0]!.value,
+    dtstart: component.properties.DTSTART![0]!.value,
+    rrule: component.properties.RRULE![0]!.value
+  }
+}
+
+export const matchTimezone = (component: Component): CalendarTimezone => {
+  // reference: https://icalendar.org/iCalendar-RFC-5545/3-6-5-time-zone-component.html
+
+  // known properties: TZID(!), LAST-MODIFIED(?), TZURL(?), X-LIC-LOCATION(?); ? = optional, ! = required
   mustOnlyOccurOnce(component.properties.TZID, 'TZID', component, 'VTIMEZONE')
   mustNotHaveParameters(component.properties.TZID, 'TZID', component, 'VTIMEZONE')
 
-  return component.properties.TZID ? component.properties.TZID[0]!.value : undefined
+  optionalButIfSetMustOccurOnlyOnce(component.properties['LAST-MODIFIED'], 'LAST-MODIFIED', component, 'VTIMEZONE')
+  optionalButIfSetMustOccurOnlyOnce(component.properties.TZURL, 'TZURL', component, 'VTIMEZONE')
+  optionalButIfSetMustOccurOnlyOnce(component.properties['X-LIC-LOCATION'], 'X-LIC-LOCATION', component, 'VTIMEZONE')
+
+  const tzid = component.properties.TZID![0]!.value
+
+  // we don't care about the parameters of LAST-MODIFIED, TZURL or X-LIC-LOCATION
+  const lastModified = component.properties['LAST-MODIFIED']
+    ? component.properties['LAST-MODIFIED'][0]!.value
+    : undefined
+
+  const tzurl = component.properties.TZURL ? component.properties.TZURL[0]!.value : undefined
+
+  const xLicLocation = component.properties['X-LIC-LOCATION']
+    ? component.properties['X-LIC-LOCATION'][0]!.value
+    : undefined
+
+  if (!component.components.DAYLIGHT && !component.components.STANDARD) {
+    throw new Error('VTIMEZONE must have at least one DAYLIGHT or STANDARD component')
+  }
+
+  const daylight = component.components.DAYLIGHT
+    ? component.components.DAYLIGHT.map((daylight) => matchDaylightOrStandard(daylight, 'DAYLIGHT'))
+    : []
+  const standard = component.components.STANDARD
+    ? component.components.STANDARD.map((standard) => matchDaylightOrStandard(standard, 'STANDARD'))
+    : []
+
+  return { tzid, lastModified, tzurl, xLicLocation, daylight, standard }
 }
 
 export const matchRecurrenceRules = (
@@ -367,7 +426,7 @@ export const matchCalendar = (component: Component): { events: CalendarEvent[]; 
   // If there are multiple `VTIMEZONE` components, use the first one
 
   // support both X-WR-TIMEZONE (property) and VTIMEZONE (component)
-  const VTimezone = component.components.VTIMEZONE ? matchTimezone(component.components.VTIMEZONE[0]!) : undefined
+  const VTimezone = component.components.VTIMEZONE ? matchTimezone(component.components.VTIMEZONE[0]!).tzid : undefined
 
   if (!maybeXWrTimezone && !VTimezone) {
     throw new Error('VCALENDAR must have a configured timezone. Either use X-WR-TIMEZONE or VTIMEZONE')
@@ -375,7 +434,16 @@ export const matchCalendar = (component: Component): { events: CalendarEvent[]; 
 
   const timezone = (maybeXWrTimezone || VTimezone) as string
 
-  const metadata = { timezone, version: maybeVersion, prodid: maybeProdId, calscale: maybeCalScale, rest }
+  const definedTimezones = component.components.VTIMEZONE ? component.components.VTIMEZONE.map(matchTimezone) : []
+
+  const metadata = {
+    timezone,
+    definedTimezones,
+    version: maybeVersion,
+    prodid: maybeProdId,
+    calscale: maybeCalScale,
+    rest
+  }
 
   const maybeEvents = component.components.VEVENT
     ? component.components.VEVENT.map((event) => {
